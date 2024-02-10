@@ -88,14 +88,24 @@ Run the scripts below to align the downloaded PBMC1k sample data with STAR.
 ```bash
 # Align the reads to reference
 STAR_IDX_REFS="$FST_SAMPLE_DIR/data/star_spliceu_refs"
+
+export STAR_out=$FST_SAMPLE_DIR/STAR_out
+mkdir -p $STAR_out
+
 STAR --runThreadN 12 \
-    --readFilesIn $FASTQ_DIR/pbmc_1k_v3_S1_L001_R2_001.fastq.gz,$FASTQ_DIR/pbmc_1k_v3_S1_L002_R2_001.fastq.gz \
+    --readFilesIn $FASTQ_DIR/pbmc_1k_v3_S1_L001_R2_001.fastq.gz,$FASTQ_DIR/pbmc_1k_v3_S1_L002_R2_001.fastq.gz $FASTQ_DIR/pbmc_1k_v3_S1_L001_R1_001.fastq.gz,$FASTQ_DIR/pbmc_1k_v3_S1_L002_R1_001.fastq.gz\
     --readFilesCommand zcat \
-    --genomeDir $STAR_IDX_REFS \
-    --outFileNamePrefix $FST_SAMPLE_DIR/STAR_out/ \
+    --genomeDir $STAR_IDX_DIR \
+    --outFileNamePrefix $STAR_out \
     --outSAMtype BAM SortedByCoordinate \
     --quantMode TranscriptomeSAM \
-    --quantTranscriptomeBan Singleend
+    --soloType CB_UMI_Simple \
+    --soloUMIlen 12 \
+    --soloBarcodeReadLength 0 \
+    --soloCBwhitelist $FST_SAMPLE_DIR/data/whitelist/3M-february-2018.txt \
+    --soloFeatures GeneFull \
+    --outSAMattributes NH HI nM AS CR UR CB UB GX GN sS sQ sM \
+    --limitIObufferSize 50000000 50000000 
 ```
 - `--readFilesIn` passes the path to your fastq file.
 - Use `--readFilesCommand zcat` if you have compressed fastq files (i.e. *.gz)
@@ -104,8 +114,15 @@ STAR --runThreadN 12 \
 - `--outSAMtype BAM SortedByCoordinate` will output the sorted BAM file 
 - With `--quantMode TranscriptomeSAM`, STAR will output alignments translated into transcript coordinates, and `--quantTranscriptomeBan Singleend` allows insertions, deletions ans soft-clips in the transcriptomic alignments.
 
-Then, we use samtools to filter the reads have unique map to the genome. 
 
+> Note: The following section is an OPTINAL step for standard process. **In short**, we extract the top cells to reduce the time for the tutorial. Therefore,
+- if you are **playing with the 10X 1kPBMC sample data** and want to save time and check how the predcition model works, you could follow this step. 
+- If you are **using a small dataset**, you can skip this section and continue to the next step: _filter the reads have unique map to the genome_.
+
+The 10X 1kPBMC sample data have 200 million algnments when mapping to Transcriptom. To reduce the time taken for completing the tutorial, **we extract the top 200 cells**. The filtering is done based on the gene count matrix provided on 10X website. The top cells defined by cells with at least 3000 genes in count matrix.
+If you are playing with the 10X 1kPBMC sample data, you can check the scripts we used to filter the reads, which is saved in `forseti/preprocess/get_top_cell.sh` and `extract_top_cells.py`. The filtered bam file contains 65,784,347 alignments, and will take 3.3 hour in 32threads for the prediciton.
+
+Then, we use samtools to filter the reads have unique map to the genome. 
 ```bash
 # Run in shell
 STAR_OUT_DIR="$FST_SAMPLE_DIR/STAR_out"
@@ -234,35 +251,49 @@ For the `predictions` :
 * _max_prob_ : represents the maximum probobability when comparing antisense_prob and sense_prob for this gene
 * _unsplice_prob_ : probobability of reads is unsplice
 * _splice_prob_ : probobability of reads is splice
+
+For reads have unique assigned gene(i.e. forseti_read.is_multi_mapped == True), you can get the only predciiton record by calling '.get_get_predictions()', and then access the specific prediction record values. Below, we show what does the prediciton results look like in 4 examples. Reads are assigned to S(Spliced), U(Unspliced), A(Ambiguous), and multi-mapped reads.
 ```Python
-# For reads have unique assigned gene, the prediction is the first element in the predicityon list
 # example 1
-rname = 'A00228:279:HFWFVDMXX:1:1101:16477:1063'
+rname = 'A00228:279:HFWFVDMXX:1:1109:30454:13463'
 forseti_read = forseti_dict[rname]
-print(forseti_read.read_name) # 'A00228:279:HFWFVDMXX:1:1101:16477:1063'
+print(forseti_read.read_name) # A00228:279:HFWFVDMXX:1:1109:30454:13463
 print(forseti_read.is_multi_mapped) # False
-prediction = forseti_read.predictions[0]
+prediction = forseti_read.get_predictions()
 print(prediction.splicing_status) # S ,indicates spliced
-print(prediction.gene_id) # ENSG00000198712
+print(prediction.gene_id) # ENSG00000115282
 print(prediction.orientation) # +, indicates sense strand
-print(prediction.max_prob) # 0.006903024469278407
-print(prediction.unsplice_prob) # 0
-print(prediction.splice_prob) # 1
+print(prediction.max_prob) # 6.176078485466973e-05
+print(prediction.unsplice_prob) # 0.0
+print(prediction.splice_prob) # 1.0
 
 # example 2
-rname = 'A00228:279:HFWFVDMXX:1:1101:27525:1251'
+rname = 'A00228:279:HFWFVDMXX:1:1117:25518:32972'
 forseti_read = forseti_dict[rname]
-print(forseti_read.read_name) # 'A00228:279:HFWFVDMXX:1:1101:27525:1251'
+print(forseti_read.read_name) # 'A00228:279:HFWFVDMXX:1:1117:25518:32972'
 print(forseti_read.is_multi_mapped) # False
-prediction = forseti_read.predictions[0]
+prediction = forseti_read.get_predictions()
 print(prediction.splicing_status) # U ,indicates unspliced
-print(prediction.gene_id) # ENSG00000251562
+print(prediction.gene_id) # ENSG00000117616
 print(prediction.orientation) # + , indicates sense strand
-print(prediction.max_prob) # 5.965312556396646e-05
-print(prediction.unsplice_prob) # 0.8834203210726559
-print(prediction.splice_prob) # 0.11657967892734424
+print(prediction.max_prob) # 0.006903024469278407
+print(prediction.unsplice_prob) # 0.6380657291449385
+print(prediction.splice_prob) # 0.36193427085506147
 
-# example 3 for how to access the predcition for multimapped reads
+# example 3 for Ambiguous read
+rname = 'A00228:279:HFWFVDMXX:1:1101:6994:26256'
+forseti_read = forseti_dict[rname]
+print(forseti_read.read_name) # 'A00228:279:HFWFVDMXX:1:1117:25518:32972'
+print(forseti_read.is_multi_mapped) # False
+prediction = forseti_read.get_predictions()
+print(prediction.splicing_status) # A ,indicates unspliced
+print(prediction.gene_id) # ENSG00000026025
+print(prediction.orientation) # + , indicates sense strand
+print(prediction.max_prob) # 0.0003280696383465825
+print(prediction.unsplice_prob) # 0.5
+print(prediction.splice_prob) # 0.5
+
+# example 4 for how to access the predcition for multimapped reads
 rname = 'A00228:279:HFWFVDMXX:1:1101:25373:1783'
 forseti_read = forseti_dict[rname]
 print(forseti_read.read_name) 
@@ -280,20 +311,20 @@ for prediction in prediction_lst:
 '''
 For the multi-mapped reads. it will return the list of predcitions:
 
-A00228:279:HFWFVDMXX:1:1101:25373:1783
+A00228:279:HFWFVDMXX:1:1109:17400:19820
 True
-ENSG00000152705
-+
-U
-0.002013650687849949
-1.0
-0.0
-ENSG00000132570
+ENSG00000173821
 +
 A
-0.002013650687849949
+0.0068454212748862405
 0.5
 0.5
+ENSG00000263069
+-
+U
+0.0068454212748862405
+1.0
+0.0
 '''
 
 ```
@@ -311,3 +342,4 @@ print(f"""
     num of final ambiguous reads: {predicitons_log["final_ambiguous_count"]}
     """)
 ```
+
