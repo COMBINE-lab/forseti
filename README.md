@@ -107,12 +107,15 @@ STAR --runThreadN 12 \
     --outSAMattributes NH HI nM AS CR UR CB UB GX GN sS sQ sM \
     --limitIObufferSize 50000000 50000000 
 ```
+
 - `--readFilesIn` passes the path to your fastq file.
 - Use `--readFilesCommand zcat` if you have compressed fastq files (i.e. *.gz)
 - With `--genomeDir` option, you pass the path to the folder storing the spliceu index. 
 - `--outFileNamePrefix` passes the path to your output
 - `--outSAMtype BAM SortedByCoordinate` will output the sorted BAM file 
 - With `--quantMode TranscriptomeSAM`, STAR will output alignments translated into transcript coordinates, and `--quantTranscriptomeBan Singleend` allows insertions, deletions ans soft-clips in the transcriptomic alignments.
+- The PBMC1k data in this tutorial is 10X chemistry v3, so we use `--soloType CB_UMI_Simple` , `--soloUMIlen 12`, `--soloBarcodeReadLength 0` and `--soloCBwhitelist 3M-february-2018.txt`.
+- `--soloFeatures GeneFull` outputs exon and intron UMI counts.
 
 
 > Note: The following section is an OPTINAL step for standard process. **In short**, we extract the top cells to reduce the time for the tutorial. Therefore,
@@ -121,6 +124,7 @@ STAR --runThreadN 12 \
 
 The 10X 1kPBMC sample data have 200 million algnments when mapping to Transcriptom. To reduce the time taken for completing the tutorial, **we extract the top 200 cells**. The filtering is done based on the gene count matrix provided on 10X website. The top cells defined by cells with at least 3000 genes in count matrix.
 If you are playing with the 10X 1kPBMC sample data, you can check the scripts we used to filter the reads, which is saved in `forseti/preprocess/get_top_cell.sh` and `extract_top_cells.py`. The filtered bam file contains 65,784,347 alignments, and will take 3.3 hour in 32threads for the prediciton.
+
 
 Then, we use samtools to filter the reads have unique map to the genome. 
 ```bash
@@ -151,7 +155,6 @@ bedtools intersect \
 cut -f 4 $STAR_OUT_DIR/exonic_reads.bed > $STAR_OUT_DIR/exonic_read_name.txt
 # filter the exonic reads in toTranscriptome.bam file
 samtools view -N $STAR_OUT_DIR/exonic_read_name.txt -o $STAR_OUT_DIR/exonic_Aligned.toTranscriptome.out.bam $STAR_OUT_DIR/filtered_Aligned.toTranscriptome.out.bam
-
 ```
 ## 3- Apply _Forseti_ prediction model
 There are several things you want to know before playing with the model.
@@ -234,9 +237,9 @@ forseti_dict, predicitons_log = forseti_predictor(reads_txome_bam_file, unimap_r
 ```
 ### 3.3- Access to the prediction results
 
-Here, we use read named 'SRR8210369.63083182' as an example to show you how to access to the prediction record for each read.  
+Here, we use different examples to show you how to access to the prediction record for each read.  
 
-First, we get the prediction record from _forseti_dict_ by its read name. For each `forseti_read`, you can obtain its read name and boolean for whether it is multi-mapped. 
+First, we get the prediction record from _forseti dict_ by its read name. For each `forseti_read`, you can obtain its read name and boolean for whether it is multi-mapped. 
 * In our model, if'_is_multi_mapped_' is TRUE, which means the we got one best gene for the read's origin; while '_is_multi_mapped_' is FALSE, indicates that there are multiple best genes and they got a tie, and all of them will be listed in the _predicitons_.
 
 For the `predictions` :
@@ -286,7 +289,7 @@ forseti_read = forseti_dict[rname]
 print(forseti_read.read_name) # 'A00228:279:HFWFVDMXX:1:1117:25518:32972'
 print(forseti_read.is_multi_mapped) # False
 prediction = forseti_read.get_predictions()
-print(prediction.splicing_status) # A ,indicates unspliced
+print(prediction.splicing_status) # A ,indicates ambiguous
 print(prediction.gene_id) # ENSG00000026025
 print(prediction.orientation) # + , indicates sense strand
 print(prediction.max_prob) # 0.0003280696383465825
