@@ -12,6 +12,7 @@ import time
 from joblib import Parallel, delayed
 import random
 from pathlib import Path
+import joblib
 
 
 def split_large_bam(large_bam_file_path, forseti_sample_dir, num_threads=12):
@@ -349,7 +350,7 @@ def algn_to_tx_prob_parallel(reads_txome_bam_file, forseti_sample_dir,  spline_m
         raise ValueError("The spline model is not valid.")
     try:
         with open(mlp_model_file, 'rb') as file_model:
-            mlp = pickle.load(file_model)
+            mlp = joblib.load(file_model)
     except:
         raise ValueError("The MLP model is not valid.")
     # prepare the spliceu txome map
@@ -368,7 +369,6 @@ def algn_to_tx_prob_parallel(reads_txome_bam_file, forseti_sample_dir,  spline_m
 
 
 class ReadOriginPredictor:
-    # TODO: modify the description
 
     """
     define a function that takes a read alignment, and the polyA intervals of the reference, 

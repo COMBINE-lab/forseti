@@ -189,8 +189,8 @@ Forseti will return 2 objects:
 > Note: All scripts below (3.0-3.3) will be executed in _Python_. Make sure you created this python file on the top level of the `forseti_sample_dir` folder.
 ```Python
 import os
-import pickle
-from forseti.prediction_model import forseti_predictor, get_initial_splicing_status
+from forseti.modules.prediction_model import forseti_predictor, get_initial_splicing_status
+
 ```
 ### 3.1- Prepare input files.
 Specify the path to _spliceu fasta_ file and _t2g_ file you've got from `Step1-Build spliceu index`, and the toTxome bam file (use Trasncriptom as reference) from `Step2-Align with STAR`. Also, the _unimap read names_ derived from the toGenome bam file(use Genome as reference).
@@ -212,7 +212,7 @@ We provide 2 pre-built models: the `spline model` for fragment length distributi
 ```Python
 # Pass the path for spline model and mlp model
 spline_model_file = os.path.join(forseti_sample_dir, "forseti","pre_built_models", "spline_model.pkl")
-mlp_model_file = os.path.join(forseti_sample_dir, "forseti","pre_built_models","mlp.pkl")
+mlp_model_file = os.path.join(forseti_sample_dir, "forseti","pre_built_models","mlp_pa6with1mm.pkl")
 ```
 Set up parameters if you don't want to use the default values listed below.
 ```Python
